@@ -36,7 +36,8 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     voice_channel = interaction.user.voice.channel
 
     if voice_channel is None:
-        await interaction.followup.send("You must be in a voice channel")
+        msg = await interaction.followup.send("You must be in a voice channel")
+        await cleanup(msg)
         return
 
     voice_client = interaction.guild.voice_client
@@ -60,7 +61,8 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     tracks = results.get("entries", [])
 
     if not tracks:
-        await interaction.followup.send("No results found.")
+        msg = await interaction.followup.send("No results found.")
+        await cleanup(msg)
         return
     
     first_track = tracks[0]
@@ -74,18 +76,24 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     SONG_QUEUES[guild_id].append((audio_url, title))
 
     if voice_client.is_playing() or voice_client.is_paused():
-        await interaction.followup.send(f"Added to queue: **{title}**")
+        msg = await interaction.followup.send(f"Added to queue: **{title}**")
     else:
-        await interaction.followup.send(f"Now playing: **{title}**")
+        msg = await interaction.followup.send(f"Now playing: **{title}**")
         await play_next_song(voice_client, guild_id, interaction.channel)
+
+    await send_to_archive(f"Added to queue: **{title}**", 1427664996497621095)
+    await cleanup(msg)
+
 
 @bot.tree.command(name="skip", description="skip this song duh")
 async def skip(interaction: discord.Interaction):
     if interaction.guild.voice_client and (interaction.guild.voice_client.is_playing() or interaction.guild.voice_client.is_paused()):
         interaction.guild.voice_client.stop()
-        await interaction.response.send_message("Skipping current song")
+        msg = await interaction.response.send_message("Skipping current song")
     else:
-        await interaction.response.send_message("Not playing anything to skip")
+        msg = await interaction.response.send_message("Not playing anything to skip")
+
+    await cleanup(msg)
 
 async def play_next_song(voice_client, guild_id, channel):
     if SONG_QUEUES[guild_id]:
@@ -96,7 +104,8 @@ async def play_next_song(voice_client, guild_id, channel):
             "options": "-vn -c:a libopus -b:a 96k",
         }
 
-        source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options, executable="C:\\Users\\papej\\Desktop\\discord_music_bot\\bin\\ffmpeg\\ffmpeg.exe")
+        source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options, executable="ffmpeg")
+
 
         def after_play(error):
             if error:
@@ -104,11 +113,22 @@ async def play_next_song(voice_client, guild_id, channel):
             asyncio.run_coroutine_threadsafe(play_next_song(voice_client, guild_id, channel), bot.loop)
 
         voice_client.play(source, after=after_play)
-        asyncio.create_task(channel.send(f"Now playing: **{title}**"))
+        asyncio.create_task(channel.send(f"Now playing: **{title}**", delete_after = 60))
 
     else:
         await voice_client.disconnect()
         SONG_QUEUES[guild_id] = deque()
+
+
+async def send_to_archive(message, CHANNEL_ID):
+    channel = bot.get_channel(CHANNEL_ID)
+    print("kek")
+    if channel:
+        await channel.send(message)
+
+async def cleanup(message):
+    await asyncio.sleep(60)
+    await message.delete()
 
 
 bot.run(token)
