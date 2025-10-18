@@ -54,18 +54,27 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         "youtube_include_hls_manifest": False,
     }
 
-    query = f"ytsearch1:{song_query}"
-
+    if song_query.startswith("https://"):
+        print("it does")
+        query = f"ytsearch1:{song_query}"
+    else:
+        print("it doesnt") # TODO : make a dropdown menu to select song when searching via a name and not a link
+        query = f"ytsearch1:{song_query}"
+        #dropdownMenu()
+    
+    result = query.split("&")
+    query = result[0]
 
     results = await search_ytdlp_async(query, ydl_options)
     tracks = results.get("entries", [])
 
     if not tracks:
         msg = await interaction.followup.send("No results found.")
-        await cleanup(msg)
+        await cleanup(msg, 10)
         return
     
     first_track = tracks[0]
+
     audio_url = first_track["url"]
     title = first_track.get("title", "Untitled")
 
@@ -81,7 +90,7 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         msg = await interaction.followup.send(f"Now playing: **{title}**")
         await play_next_song(voice_client, guild_id, interaction.channel)
 
-    await send_to_archive(f"Added to queue: **{title}**", 1427664996497621095)
+    await send_to_archive(f"Added to queue: **{title}** requested by {interaction.user.name}", 1427664996497621095)
     await cleanup(msg)
 
 
@@ -104,7 +113,7 @@ async def play_next_song(voice_client, guild_id, channel):
             "options": "-vn -c:a libopus -b:a 96k",
         }
 
-        source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options, executable="ffmpeg")
+        source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options, executable="C:\\Users\\papej\\Desktop\\discord_music_bot\\bin\\ffmpeg\\ffmpeg.exe")
 
 
         def after_play(error):
@@ -119,16 +128,22 @@ async def play_next_song(voice_client, guild_id, channel):
         await voice_client.disconnect()
         SONG_QUEUES[guild_id] = deque()
 
-
 async def send_to_archive(message, CHANNEL_ID):
     channel = bot.get_channel(CHANNEL_ID)
-    print("kek")
     if channel:
         await channel.send(message)
 
-async def cleanup(message):
-    await asyncio.sleep(60)
+async def cleanup(message, timer=60):
+    await asyncio.sleep(timer)
     await message.delete()
 
+async def dropdownMenu():
+    ydl_options = {
+        "quiet": True,
+        "extract_flat": True,  
+        "skip_download": True,
+        "noplaylist": True
+    }
+    pass
 
 bot.run(token)
