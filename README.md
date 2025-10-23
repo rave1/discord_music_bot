@@ -11,4 +11,9 @@ docker run --env-file .env -it music-bot /bin/sh
 ```
 
 remember to keep ur var in file 
-essa
+
+if u want u can use ruff for linting
+
+```shell
+uv run ruff check
+```
