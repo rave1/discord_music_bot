@@ -1,2 +1,4 @@
 .env
 bin
+.venv/
+.ruff_cache
