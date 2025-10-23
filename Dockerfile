@@ -8,7 +8,7 @@ ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 
 WORKDIR /home/bot
 
-COPY main.py .
+COPY *.py .
 COPY pyproject.toml .
 COPY uv.lock .
 
