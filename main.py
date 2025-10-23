@@ -10,7 +10,7 @@ import asyncio
 from schemas import TrackSchema
 from utils import play_file
 from loguru import logger
-
+import commands as command_file
 from typing import Any
 
 load_dotenv
@@ -37,11 +37,17 @@ intents.message_content = True
 intents.voice_states = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+command_file.setup(bot=bot)
+
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
     logger.info(f"Logged in as {bot.user}")
+    try:
+        synced = await bot.tree.sync()
+        logger.info(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        logger.error(f"Sync failed: {e}")
 
 
 @bot.tree.command(name="play", description="play music duh")
