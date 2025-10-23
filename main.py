@@ -150,4 +150,19 @@ async def queue(interaction: discord.Interaction):
     await interaction.response.send_message(content=message)
 
 
+@bot.event
+async def on_voice_state_update(member, before, after):
+    # Only care about your bot's voice channel
+    voice_client = discord.utils.get(bot.voice_clients, guild=member.guild)
+    if not voice_client or not voice_client.channel:
+        return
+
+    # Get current members in the bot's channel (ignore the bot itself)
+    members = [m for m in voice_client.channel.members if not m.bot]
+
+    # If no non-bot members are left, disconnect
+    if len(members) == 0:
+        await voice_client.disconnect()
+
+
 bot.run(token)
