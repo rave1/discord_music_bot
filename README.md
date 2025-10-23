@@ -1,3 +1,9 @@
+# uv 
+
+use uv brother
+
+https://docs.astral.sh/uv/getting-started/installation/
+
 # build
 
 ```shell
