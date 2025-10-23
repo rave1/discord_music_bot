@@ -8,26 +8,34 @@ import ffmpeg
 from collections import deque
 
 load_dotenv
-token = os.getenv('DISCORD_TOKEN')
+token = os.getenv("DISCORD_TOKEN")
+
+if not token:
+    raise Exception("Token not found.")
 
 SONG_QUEUES = {}
+
 
 async def search_ytdlp_async(query, ydl_opts):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, lambda: _extract(query, ydl_opts))
 
+
 def _extract(query, ydl_opts):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(query, download=False)
 
+
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='/', intents=intents)
+bot = commands.Bot(command_prefix="/", intents=intents)
+
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync() 
-    print(f'Logged in as {bot.user}')
+    await bot.tree.sync()
+    print(f"Logged in as {bot.user}")
+
 
 @bot.tree.command(name="play", description="play music duh")
 async def play_music(interaction: discord.Interaction, song_query: str):
@@ -58,10 +66,12 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         print("it does")
         query = f"ytsearch1:{song_query}"
     else:
-        print("it doesnt") # TODO : make a dropdown menu to select song when searching via a name and not a link
+        print(
+            "it doesnt"
+        )  # TODO : make a dropdown menu to select song when searching via a name and not a link
         query = f"ytsearch1:{song_query}"
-        #dropdownMenu()
-    
+        # dropdownMenu()
+
     result = query.split("&")
     query = result[0]
 
@@ -72,7 +82,7 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         msg = await interaction.followup.send("No results found.")
         await cleanup(msg, 10)
         return
-    
+
     first_track = tracks[0]
 
     audio_url = first_track["url"]
@@ -90,19 +100,26 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         msg = await interaction.followup.send(f"Now playing: **{title}**")
         await play_next_song(voice_client, guild_id, interaction.channel)
 
-    await send_to_archive(f"Added to queue: **{title}** requested by {interaction.user.name}", 1427664996497621095)
+    await send_to_archive(
+        f"Added to queue: **{title}** requested by {interaction.user.name}",
+        1427664996497621095,
+    )
     await cleanup(msg)
 
 
 @bot.tree.command(name="skip", description="skip this song duh")
 async def skip(interaction: discord.Interaction):
-    if interaction.guild.voice_client and (interaction.guild.voice_client.is_playing() or interaction.guild.voice_client.is_paused()):
+    if interaction.guild.voice_client and (
+        interaction.guild.voice_client.is_playing()
+        or interaction.guild.voice_client.is_paused()
+    ):
         interaction.guild.voice_client.stop()
         msg = await interaction.response.send_message("Skipping current song")
     else:
         msg = await interaction.response.send_message("Not playing anything to skip")
 
     await cleanup(msg)
+
 
 async def play_next_song(voice_client, guild_id, channel):
     if SONG_QUEUES[guild_id]:
@@ -113,37 +130,46 @@ async def play_next_song(voice_client, guild_id, channel):
             "options": "-vn -c:a libopus -b:a 96k",
         }
 
-        source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options, executable="C:\\Users\\papej\\Desktop\\discord_music_bot\\bin\\ffmpeg\\ffmpeg.exe")
-
+        source = discord.FFmpegOpusAudio(
+            audio_url,
+            **ffmpeg_options,
+            executable="C:\\Users\\papej\\Desktop\\discord_music_bot\\bin\\ffmpeg\\ffmpeg.exe",
+        )
 
         def after_play(error):
             if error:
                 print(f"error playing {title}: {error}")
-            asyncio.run_coroutine_threadsafe(play_next_song(voice_client, guild_id, channel), bot.loop)
+            asyncio.run_coroutine_threadsafe(
+                play_next_song(voice_client, guild_id, channel), bot.loop
+            )
 
         voice_client.play(source, after=after_play)
-        asyncio.create_task(channel.send(f"Now playing: **{title}**", delete_after = 60))
+        asyncio.create_task(channel.send(f"Now playing: **{title}**", delete_after=60))
 
     else:
         await voice_client.disconnect()
         SONG_QUEUES[guild_id] = deque()
+
 
 async def send_to_archive(message, CHANNEL_ID):
     channel = bot.get_channel(CHANNEL_ID)
     if channel:
         await channel.send(message)
 
+
 async def cleanup(message, timer=60):
     await asyncio.sleep(timer)
     await message.delete()
 
+
 async def dropdownMenu():
     ydl_options = {
         "quiet": True,
-        "extract_flat": True,  
+        "extract_flat": True,
         "skip_download": True,
-        "noplaylist": True
+        "noplaylist": True,
     }
     pass
+
 
 bot.run(token)
