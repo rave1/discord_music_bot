@@ -8,3 +8,8 @@ dependencies = [
     "ffmpeg>=1.4",
     "yt-dlp>=2025.10.22",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.1",
+]
