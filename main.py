@@ -2,11 +2,14 @@ import discord
 
 from discord.ext import commands
 from dotenv import load_dotenv
+from discord.ui.view import View
+from components import SelectMusic
 import os
 import yt_dlp
 import asyncio
 import ffmpeg
 from collections import deque
+from schemas import TrackSchema
 
 from typing import Any
 
@@ -50,7 +53,7 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     if voice_channel is None:
         msg = await interaction.followup.send("You must be in a voice channel")
         await cleanup(msg)
-        return
+        return None
 
     voice_client = interaction.guild.voice_client
 
@@ -83,32 +86,15 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         return
 
     first_five_tracks: list[dict[str, Any]] = tracks[:5]
-    first_five_titles: list[str] = [track["title"] for track in first_five_tracks]
+    first_five_titles: list[TrackSchema] = [
+        {"title": track["title"], "url": track["url"]} for track in first_five_tracks
+    ]
 
-    print(first_five_titles)
-
-    first_track = tracks[0]
-
-    audio_url = first_track["url"]
-    title = first_track.get("title", "Untitled")
-
-    guild_id = str(interaction.guild_id)
-    if SONG_QUEUES.get(guild_id) is None:
-        SONG_QUEUES[guild_id] = deque()
-
-    SONG_QUEUES[guild_id].append((audio_url, title))
-
-    if voice_client.is_playing() or voice_client.is_paused():
-        msg = await interaction.followup.send(f"Added to queue: **{title}**")
-    else:
-        msg = await interaction.followup.send(f"Now playing: **{title}**")
-        await play_next_song(voice_client, guild_id, interaction.channel)
-
-    await send_to_archive(
-        f"Added to queue: **{title}** requested by {interaction.user.name}",
-        1427664996497621095,
+    tracks_view = View()
+    tracks_view.add_item(
+        SelectMusic(tracks=first_five_titles, voice_client=voice_client)
     )
-    await cleanup(msg)
+    await interaction.followup.send("Pick one", view=tracks_view, ephemeral=True)
 
 
 @bot.tree.command(name="stop", description="stop song nigga")
@@ -161,25 +147,9 @@ async def play_next_song(voice_client, guild_id, channel):
         SONG_QUEUES[guild_id] = deque()
 
 
-async def send_to_archive(message, CHANNEL_ID):
-    channel = bot.get_channel(CHANNEL_ID)
-    if channel:
-        await channel.send(message)
-
-
 async def cleanup(message, timer=60):
     await asyncio.sleep(timer)
     await message.delete()
-
-
-async def dropdownMenu():
-    ydl_options = {
-        "quiet": True,
-        "extract_flat": True,
-        "skip_download": True,
-        "noplaylist": True,
-    }
-    pass
 
 
 bot.run(token)
