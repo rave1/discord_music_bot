@@ -1,4 +1,5 @@
 import discord
+
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
@@ -7,8 +8,10 @@ import asyncio
 import ffmpeg
 from collections import deque
 
+from typing import Any
+
 load_dotenv
-token = os.getenv("DISCORD_TOKEN")
+token = "dummy"
 
 if not token:
     raise Exception("Token not found.")
@@ -28,7 +31,8 @@ def _extract(query, ydl_opts):
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="/", intents=intents)
+intents.voice_states = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 
 @bot.event
@@ -60,28 +64,28 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         "noplaylist": True,
         "youtube_include_dash_manifest": False,
         "youtube_include_hls_manifest": False,
+        "quiet": True,
+        "extract_flat": True,
+        "skip_download": True,
     }
 
-    if song_query.startswith("https://"):
-        print("it does")
-        query = f"ytsearch1:{song_query}"
-    else:
-        print(
-            "it doesnt"
-        )  # TODO : make a dropdown menu to select song when searching via a name and not a link
-        query = f"ytsearch1:{song_query}"
-        # dropdownMenu()
+    query = f"ytsearch5:{song_query}"  # ytsearch5 means first five results, yikes
 
     result = query.split("&")
     query = result[0]
 
     results = await search_ytdlp_async(query, ydl_options)
-    tracks = results.get("entries", [])
+    tracks: list[dict[str, Any]] = results.get("entries", [])
 
     if not tracks:
         msg = await interaction.followup.send("No results found.")
         await cleanup(msg, 10)
         return
+
+    first_five_tracks: list[dict[str, Any]] = tracks[:5]
+    first_five_titles: list[str] = [track["title"] for track in first_five_tracks]
+
+    print(first_five_titles)
 
     first_track = tracks[0]
 
@@ -105,6 +109,12 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         1427664996497621095,
     )
     await cleanup(msg)
+
+
+@bot.tree.command(name="stop", description="stop song nigga")
+async def stop(interaction: discord.Interaction):
+    interaction.guild.voice_client.stop()
+    await interaction.response.send_message("Stopping nigga.")
 
 
 @bot.tree.command(name="skip", description="skip this song duh")
