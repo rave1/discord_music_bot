@@ -7,19 +7,19 @@ from components import SelectMusic
 import os
 import yt_dlp
 import asyncio
-import ffmpeg
-from collections import deque
 from schemas import TrackSchema
+from utils import play_file
+from loguru import logger
 
 from typing import Any
 
 load_dotenv
-token = "dummy"
+token = os.getenv("DISCORD_TOKEN")
 
 if not token:
     raise Exception("Token not found.")
 
-SONG_QUEUES = {}
+song_queue: list[TrackSchema] = []
 
 
 async def search_ytdlp_async(query, ydl_opts):
@@ -41,7 +41,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"Logged in as {bot.user}")
+    logger.info(f"Logged in as {bot.user}")
 
 
 @bot.tree.command(name="play", description="play music duh")
@@ -51,8 +51,7 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     voice_channel = interaction.user.voice.channel
 
     if voice_channel is None:
-        msg = await interaction.followup.send("You must be in a voice channel")
-        await cleanup(msg)
+        await interaction.followup.send("You must be in a voice channel")
         return None
 
     voice_client = interaction.guild.voice_client
@@ -72,7 +71,10 @@ async def play_music(interaction: discord.Interaction, song_query: str):
         "skip_download": True,
     }
 
-    query = f"ytsearch5:{song_query}"  # ytsearch5 means first five results, yikes
+    if song_query.startswith("https://"):
+        query = f"ytsearch1:{song_query}"
+    else:
+        query = f"ytsearch5:{song_query}"  # ytsearch5 means first five results, yikes
 
     result = query.split("&")
     query = result[0]
@@ -81,9 +83,8 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     tracks: list[dict[str, Any]] = results.get("entries", [])
 
     if not tracks:
-        msg = await interaction.followup.send("No results found.")
-        await cleanup(msg, 10)
-        return
+        await interaction.followup.send("No results found.")
+        return None
 
     first_five_tracks: list[dict[str, Any]] = tracks[:5]
     first_five_titles: list[TrackSchema] = [
@@ -92,7 +93,12 @@ async def play_music(interaction: discord.Interaction, song_query: str):
 
     tracks_view = View()
     tracks_view.add_item(
-        SelectMusic(tracks=first_five_titles, voice_client=voice_client)
+        SelectMusic(
+            tracks=first_five_titles,
+            voice_client=voice_client,
+            queue=song_queue,
+            loop=bot.loop,
+        )
     )
     await interaction.followup.send("Pick one", view=tracks_view, ephemeral=True)
 
@@ -103,53 +109,45 @@ async def stop(interaction: discord.Interaction):
     await interaction.response.send_message("Stopping nigga.")
 
 
-@bot.tree.command(name="skip", description="skip this song duh")
+@bot.tree.command(name="skip", description="skip song ludologia")
 async def skip(interaction: discord.Interaction):
     if interaction.guild.voice_client and (
         interaction.guild.voice_client.is_playing()
         or interaction.guild.voice_client.is_paused()
     ):
-        interaction.guild.voice_client.stop()
-        msg = await interaction.response.send_message("Skipping current song")
-    else:
-        msg = await interaction.response.send_message("Not playing anything to skip")
-
-    await cleanup(msg)
-
-
-async def play_next_song(voice_client, guild_id, channel):
-    if SONG_QUEUES[guild_id]:
-        audio_url, title = SONG_QUEUES[guild_id].popleft()
-
-        ffmpeg_options = {
-            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": "-vn -c:a libopus -b:a 96k",
-        }
-
-        source = discord.FFmpegOpusAudio(
-            audio_url,
-            **ffmpeg_options,
-            executable="/usr/bin/ffmpeg",
-        )
-
-        def after_play(error):
-            if error:
-                print(f"error playing {title}: {error}")
-            asyncio.run_coroutine_threadsafe(
-                play_next_song(voice_client, guild_id, channel), bot.loop
+        voice_client = interaction.guild.voice_client
+        voice_client.stop()
+        if not song_queue:
+            await interaction.response.send_message(
+                "Queue is empty, stopping playback.", ephemeral=False
             )
+            return None
 
-        voice_client.play(source, after=after_play)
-        asyncio.create_task(channel.send(f"Now playing: **{title}**", delete_after=60))
-
+        await interaction.response.send_message("Skipping current song")
+        loop = bot.loop
+        next_track: TrackSchema = song_queue.pop(0)
+        await play_file(
+            interaction=interaction,
+            voice_client=interaction.guild.voice_client,
+            track_url=next_track["url"],
+            loop=loop,
+        )
     else:
-        await voice_client.disconnect()
-        SONG_QUEUES[guild_id] = deque()
+        await interaction.response.send_message("Not playing anything to skip")
+        return None
 
 
-async def cleanup(message, timer=60):
-    await asyncio.sleep(timer)
-    await message.delete()
+@bot.tree.command(name="queue", description="queue")
+async def queue(interaction: discord.Interaction):
+    if not song_queue:
+        await interaction.response.send_message(content="kJU EMPTI")
+        return None
+    formatted_queue = "\n".join(
+        f"{i + 1}. {track['title']}" for i, track in enumerate(song_queue)
+    )
+
+    message = f"**Current Queue:**\n```{formatted_queue}```"
+    await interaction.response.send_message(content=message)
 
 
 bot.run(token)

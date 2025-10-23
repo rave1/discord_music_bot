@@ -1,10 +1,15 @@
 import yt_dlp
 import discord
 from discord import VoiceProtocol
+from loguru import logger
+import asyncio
 
 
 async def play_file(
-    track_url: str, interaction: discord.Interaction, voice_client: VoiceProtocol
+    interaction: discord.Interaction,
+    voice_client: VoiceProtocol,
+    loop: asyncio.AbstractEventLoop,
+    track_url: str | None = None,
 ):
     # yt-dlp options for audio extraction
     ydl_options = {
@@ -15,6 +20,15 @@ async def play_file(
         "extract_flat": True,
         "skip_download": True,  # stream
     }
+
+    def after_playback(error):
+        if error:
+            logger.error(error)
+
+            loop.create_task(
+                interaction.followup.send(f"Error: {str(error)}", ephemeral=True)
+            )
+            return None
 
     try:
         # Extract info from URL
@@ -42,13 +56,15 @@ async def play_file(
                 },
                 executable="/usr/bin/ffmpeg",
             )
-            voice_client.play(source)
+            await interaction.followup.send(f"Now playing: {track_url}")
+            voice_client.play(source, after=after_playback)
         except Exception as e:
             await interaction.followup.send(
                 f"Error playing track: {str(e)}", ephemeral=True
             )
 
     except Exception as e:
+        logger.error(e)
         await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
         if voice_client:
             await voice_client.disconnect()
