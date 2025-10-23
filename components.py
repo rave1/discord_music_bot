@@ -4,6 +4,7 @@ from discord import VoiceProtocol
 from discord.components import SelectOption
 from schemas import TrackSchema
 from utils import play_file
+import asyncio
 
 
 class SelectMusic(Select):
@@ -11,7 +12,8 @@ class SelectMusic(Select):
         self,
         tracks: list[TrackSchema],
         voice_client: VoiceProtocol,
-        queue: list[str],
+        queue: list[TrackSchema],
+        loop: asyncio.AbstractEventLoop,
     ):
         options = [
             SelectOption(label=song["title"], value=song["url"]) for song in tracks
@@ -24,16 +26,20 @@ class SelectMusic(Select):
         )
         self.voice_client = voice_client
         self.track_queue = queue
+        self.tracks = tracks
+        self.loop = loop
 
     async def callback(self, interaction: discord.Interaction):
         # 0 is the value picked by the user
         track_url: str = self.values[0]
+        track_data: TrackSchema = next(
+            filter(lambda track: track["url"] == track_url, self.tracks), None
+        )
         if self.voice_client.is_playing():
-            track = track_url
-            if track:
-                self.track_queue.append(track)
+            if track_data:
+                self.track_queue.append(track_data)
                 await interaction.response.send_message(
-                    f"**{track}** added to queue", ephemeral=False
+                    f"**{track_data['title']}** added to queue", ephemeral=False
                 )
             else:
                 await interaction.response.send_message(
@@ -41,11 +47,11 @@ class SelectMusic(Select):
                 )
         else:
             await interaction.response.send_message(
-                f"You chose **{track_url}**!", ephemeral=True
+                f"You chose **{track_data['title']}**!", ephemeral=True
             )
             await play_file(
                 track_url=track_url,
                 interaction=interaction,
                 voice_client=self.voice_client,
-                queue=self.track_queue,
+                loop=self.loop,
             )

@@ -6,10 +6,10 @@ import asyncio
 
 
 async def play_file(
-    track_url: str,
     interaction: discord.Interaction,
     voice_client: VoiceProtocol,
-    queue: list[str],
+    loop: asyncio.AbstractEventLoop,
+    track_url: str | None = None,
 ):
     # yt-dlp options for audio extraction
     ydl_options = {
@@ -25,21 +25,10 @@ async def play_file(
         if error:
             logger.error(error)
 
-            asyncio.create_task(
+            loop.create_task(
                 interaction.followup.send(f"Error: {str(error)}", ephemeral=True)
             )
             return None
-
-        if queue:
-            next_track = queue.pop(0)
-            asyncio.create_task(
-                play_file(
-                    track_url=next_track,
-                    interaction=interaction,
-                    voice_client=voice_client,
-                    queue=queue,
-                )
-            )
 
     try:
         # Extract info from URL
