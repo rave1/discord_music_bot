@@ -109,10 +109,10 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     await interaction.followup.send("Pick one", view=tracks_view, ephemeral=True)
 
 
-@bot.tree.command(name="stop", description="stop song nigga")
+@bot.tree.command(name="stop", description="stop song")
 async def stop(interaction: discord.Interaction):
     interaction.guild.voice_client.stop()
-    await interaction.response.send_message("Stopping nigga.")
+    await interaction.response.send_message("Stopping.")
 
 
 @bot.tree.command(name="skip", description="skip song ludologia")
