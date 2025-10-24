@@ -19,5 +19,7 @@ this file has "state"
 """
 
 from schemas import TrackSchema
+from typing import Literal
 
 song_queue: list[TrackSchema] = []
+loop_mode: Literal["off", "one", "all"] = "off"

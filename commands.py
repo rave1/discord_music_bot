@@ -1,7 +1,7 @@
 from discord.ext import commands
 
 from loguru import logger
-from state import song_queue
+from state import song_queue, loop_mode
 from utils import parse_item_numbers
 
 
@@ -69,3 +69,31 @@ def setup(bot: commands.Bot):
         except IndexError as e:
             logger.error(e)
             await ctx.reply("Error")
+
+    @bot.hybrid_command(
+        name="loop",
+        with_app_command=True,
+        description="Toggle loop mode: off, one (current song), or all (whole queue).",
+    )
+    async def loop_command(ctx: commands.Context, mode: str = None):
+        """
+        /loop -> shows current mode
+        /loop one -> loops current song
+        /loop all -> loops the entire queue
+        /loop off -> disables looping
+        """
+        global loop_mode
+
+        valid_modes = {"off", "one", "all"}
+
+        if mode is None:
+            await ctx.reply(f"🔁 Current loop mode: **{loop_mode}**")
+            return
+
+        mode = mode.lower()
+        if mode not in valid_modes:
+            await ctx.reply("❌ Invalid mode. Use: `off`, `one`, or `all`.")
+            return
+
+        loop_mode = mode
+        await ctx.reply(f"✅ Loop mode set to **{loop_mode}**.")
