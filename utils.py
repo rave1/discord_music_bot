@@ -3,6 +3,7 @@ import discord
 from discord import VoiceProtocol
 from loguru import logger
 import asyncio
+import re
 
 
 async def play_file(
@@ -68,3 +69,25 @@ async def play_file(
         await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
         if voice_client:
             await voice_client.disconnect()
+
+
+def parse_item_numbers(raw: str) -> list[int]:
+    raw = raw.strip()
+
+    # Single number
+    if re.fullmatch(r"\d+", raw):
+        return [int(raw)]
+
+    # Comma-separated list (e.g., 1,2,3)
+    if re.fullmatch(r"\d+(,\d+)+", raw):
+        return [int(x) for x in raw.split(",")]
+
+    # Range (e.g., 2-5)
+    if re.fullmatch(r"\d+-\d+", raw):
+        start, end = map(int, raw.split("-"))
+        if start > end:
+            raise ValueError("Start of range cannot be greater than end.")
+        return list(range(start, end + 1))
+
+    # Otherwise invalid
+    raise ValueError("Invalid format. Use a number, comma list, or dash range.")
