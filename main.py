@@ -12,14 +12,13 @@ from utils import play_file
 from loguru import logger
 import commands as command_file
 from typing import Any
+from state import song_queue
 
 load_dotenv
 token = os.getenv("DISCORD_TOKEN")
 
 if not token:
     raise Exception("Token not found.")
-
-song_queue: list[TrackSchema] = []
 
 
 async def search_ytdlp_async(query, ydl_opts):
