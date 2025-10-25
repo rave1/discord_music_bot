@@ -12,7 +12,7 @@ from utils import play_file
 from loguru import logger
 import commands as command_file
 from typing import Any
-from state import song_queue
+from state import song_queue, loop_mode
 
 load_dotenv
 token = os.getenv("DISCORD_TOKEN")
@@ -108,10 +108,10 @@ async def play_music(interaction: discord.Interaction, song_query: str):
     await interaction.followup.send("Pick one", view=tracks_view, ephemeral=True)
 
 
-@bot.tree.command(name="stop", description="stop song nigga")
+@bot.tree.command(name="stop", description="stop song")
 async def stop(interaction: discord.Interaction):
     interaction.guild.voice_client.stop()
-    await interaction.response.send_message("Stopping nigga.")
+    await interaction.response.send_message("Stopping.")
 
 
 @bot.tree.command(name="skip", description="skip song ludologia")
@@ -120,6 +120,8 @@ async def skip(interaction: discord.Interaction):
         interaction.guild.voice_client.is_playing()
         or interaction.guild.voice_client.is_paused()
     ):
+        if loop_mode != "off":
+            await interaction.response.send_message("turn off the loop")
         voice_client = interaction.guild.voice_client
         voice_client.stop()
         if not song_queue:

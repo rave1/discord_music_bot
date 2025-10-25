@@ -3,70 +3,89 @@ import discord
 from discord import VoiceProtocol
 from loguru import logger
 import asyncio
+import state
 import re
+
+
+YDL_OPTIONS = {
+    "format": "bestaudio/best",
+    "noplaylist": True,
+    "quiet": True,
+    "no_warnings": True,
+    "extract_flat": True,
+    "skip_download": True,
+}
+
+FFMPEG_OPTIONS = {
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": "-vn -c:a libopus -b:a 96k",
+}
+
+FFMPEG_PATH = "/usr/bin/ffmpeg"
 
 
 async def play_file(
     interaction: discord.Interaction,
     voice_client: VoiceProtocol,
     loop: asyncio.AbstractEventLoop,
-    track_url: str | None = None,
+    track_url: str,
 ):
-    # yt-dlp options for audio extraction
-    ydl_options = {
-        "format": "bestaudio/best",
-        "noplaylist": True,
-        "quiet": False,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,  # stream
-    }
+    """Play a YouTube track and handle looping behavior."""
+    global current_song
 
-    def after_playback(error):
-        if error:
-            logger.error(error)
+    async def create_source(url: str):
+        """Fetch a fresh, valid stream URL from YouTube."""
+        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                raise RuntimeError("Failed to extract video info.")
+            stream_url = info.get("url")
+            if not stream_url:
+                raise RuntimeError("No valid stream URL.")
+        return discord.FFmpegOpusAudio(
+            source=stream_url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS
+        )
 
-            loop.create_task(
-                interaction.followup.send(f"Error: {str(error)}", ephemeral=True)
-            )
-            return None
+    async def start_playback(url: str):
+        """Start playback and handle completion."""
+        global current_song
+        current_song = url
+
+        source = await create_source(url)
+
+        def after_playback(error: Exception | None):
+            if error:
+                logger.error(f"Playback error: {error}")
+
+            async def handle_next():
+                global current_song
+
+                if state.loop_mode == "one" and current_song:
+                    # 🔁 Replay the same song
+                    logger.info("Looping current song...")
+                    await start_playback(current_song)
+                    return
+
+                # Normal queue behavior
+                if state.song_queue:
+                    next_song = state.song_queue.pop(0)
+                    current_song = next_song
+                    await start_playback(next_song)
+                else:
+                    current_song = None
+                    await interaction.channel.send("✅ Queue finished.")
+
+            loop.create_task(handle_next())
+
+        # Start the audio playback
+        voice_client.play(source, after=after_playback)
+        await interaction.channel.send(f"🎶 Now playing: {url}")
 
     try:
-        # Extract info from URL
-        with yt_dlp.YoutubeDL(ydl_options) as ydl:
-            info = ydl.extract_info(track_url, download=False)
-            if not info:
-                await interaction.followup.send(
-                    "Could not extract info from the URL.", ephemeral=True
-                )
-                return None
-            stream_url = info.get("url")  # direct stream url
-
-        if not stream_url:
-            await interaction.followup.send(
-                "No valid stream URL found.", ephemeral=True
-            )
-            return None
-
-        try:
-            source = discord.FFmpegOpusAudio(
-                source=stream_url,
-                **{
-                    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-                    "options": "-vn -c:a libopus -b:a 96k",
-                },
-                executable="/usr/bin/ffmpeg",
-            )
-            await interaction.followup.send(f"Now playing: {track_url}")
-            voice_client.play(source, after=after_playback)
-        except Exception as e:
-            await interaction.followup.send(
-                f"Error playing track: {str(e)}", ephemeral=True
-            )
-
+        await start_playback(track_url)
     except Exception as e:
-        logger.error(e)
-        await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
+        logger.error(f"Error in play_file: {e}")
+        await interaction.channel.send(f"❌ {e}")
         if voice_client:
             await voice_client.disconnect()
 
