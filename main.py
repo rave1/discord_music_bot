@@ -12,7 +12,7 @@ from utils import play_file
 from loguru import logger
 import commands as command_file
 from typing import Any
-from state import song_queue
+from state import song_queue, loop_mode
 
 load_dotenv
 token = os.getenv("DISCORD_TOKEN")
@@ -120,6 +120,9 @@ async def skip(interaction: discord.Interaction):
         interaction.guild.voice_client.is_playing()
         or interaction.guild.voice_client.is_paused()
     ):
+        if loop_mode != "off":
+            await interaction.response.send_message("turn off the loop")
+            return None
         voice_client = interaction.guild.voice_client
         voice_client.stop()
         if not song_queue:

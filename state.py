@@ -23,3 +23,4 @@ from typing import Literal
 
 song_queue: list[TrackSchema] = []
 loop_mode: Literal["off", "one", "all"] = "off"
+current_song: str = ""

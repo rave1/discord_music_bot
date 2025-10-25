@@ -1,7 +1,7 @@
 from discord.ext import commands
 
 from loguru import logger
-from state import song_queue, loop_mode
+import state
 from utils import parse_item_numbers
 
 
@@ -42,7 +42,7 @@ def setup(bot: commands.Bot):
         voice_client = ctx.guild.voice_client
         voice_channel = getattr(ctx.author.voice, "channel", None)
 
-        if not song_queue:
+        if not state.song_queue:
             await ctx.reply("queue is empty")
             return None
 
@@ -64,7 +64,7 @@ def setup(bot: commands.Bot):
 
         try:
             for i in sorted(items, reverse=True):  # reverse to avoid index shift
-                song_queue.pop(i - 1)
+                state.song_queue.pop(i - 1)
             await ctx.reply("✅ Removed selected items from the queue.")
         except IndexError as e:
             logger.error(e)
@@ -82,12 +82,11 @@ def setup(bot: commands.Bot):
         /loop all -> loops the entire queue
         /loop off -> disables looping
         """
-        global loop_mode
 
         valid_modes = {"off", "one", "all"}
 
         if mode is None:
-            await ctx.reply(f"🔁 Current loop mode: **{loop_mode}**")
+            await ctx.reply(f"🔁 Current loop mode: **{state.loop_mode}**")
             return
 
         mode = mode.lower()
@@ -95,5 +94,10 @@ def setup(bot: commands.Bot):
             await ctx.reply("❌ Invalid mode. Use: `off`, `one`, or `all`.")
             return
 
-        loop_mode = mode
-        await ctx.reply(f"✅ Loop mode set to **{loop_mode}**.")
+        state.loop_mode = mode
+        await ctx.reply(f"✅ Loop mode set to **{state.loop_mode}**.")
+
+    @bot.hybrid_command(name="clear")
+    async def clear_queue(ctx: commands.Context):
+        state.song_queue.clear()
+        await ctx.reply("Queue cleared.")
