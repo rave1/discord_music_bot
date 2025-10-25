@@ -83,7 +83,7 @@ def setup(bot: commands.Bot):
         /loop off -> disables looping
         """
 
-        valid_modes = {"off", "one", "all"}
+        valid_modes = {"off", "one"}
 
         if mode is None:
             await ctx.reply(f"🔁 Current loop mode: **{state.loop_mode}**")
@@ -91,7 +91,7 @@ def setup(bot: commands.Bot):
 
         mode = mode.lower()
         if mode not in valid_modes:
-            await ctx.reply("❌ Invalid mode. Use: `off`, `one`, or `all`.")
+            await ctx.reply("❌ Invalid mode. Use: `off`, `one`")
             return
 
         state.loop_mode = mode

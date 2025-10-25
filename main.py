@@ -122,7 +122,6 @@ async def skip(interaction: discord.Interaction):
     ):
         if loop_mode != "off":
             await interaction.response.send_message("turn off the loop")
-            return None
         voice_client = interaction.guild.voice_client
         voice_client.stop()
         if not song_queue:
